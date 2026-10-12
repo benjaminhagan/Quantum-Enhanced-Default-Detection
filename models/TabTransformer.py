@@ -374,7 +374,7 @@ def infer_tabtransformer(model: torch.nn.Module, df: pd.DataFrame, target_col: s
 # Full ML workflow
 # -------------------------
 # df = Time, Amount, V1 ... V28, Class
-def run_experiment(df: pd.DataFrame, lr=3e-3, target_col="Class"):
+def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', target_col="Class"):
     device = torch.device(dev_name)
 
     data = make_dataloaders(
@@ -387,46 +387,28 @@ def run_experiment(df: pd.DataFrame, lr=3e-3, target_col="Class"):
         seed=42
     )
 
-    n_features = len(data["feature_cols"])
-    # model = TabTransformerBinaryClassifier(
-    #     n_features=n_features,
-    #     d_token=64,
-    #     n_heads=8,
-    #     n_layers=4,
-    #     d_ff=256,
-    #     dropout=0.1,
-    # )
+    if model_size == 'large':
+        model_config = {
+            "n_features": len(data["feature_cols"]),
+            "d_token": 32,
+            "n_heads": 4,
+            "n_layers": 3,
+            "d_ff": 256,
+            "dropout": 0.1,
+        }
 
-    # model = TabTransformerBinaryClassifier(
-    #     n_features=n_features,
-    #     d_token=32,
-    #     n_heads=4,
-    #     n_layers=2,
-    #     d_ff=64,
-    #     dropout=0.1,
-    # )
+    if model_size == 'small':
+        model_config = {
+            "n_features": len(data["feature_cols"]),
+            "d_token": 32,
+            "n_heads": 4,
+            "n_layers": 2,
+            "d_ff": 64,
+            "dropout": 0.1,
+        }
 
-    model_config_medium = {
-        "n_features": len(data["feature_cols"]),
-        "d_token": 32,
-        "n_heads": 4,
-        "n_layers": 2,
-        "d_ff": 64,
-        "dropout": 0.1,
-    }
-
-    model = TabTransformerBinaryClassifier(**model_config_medium)
-
-    # model = TabTransformerBinaryClassifier(
-    #     n_features=n_features,
-    #     d_token=32,
-    #     n_heads=4,
-    #     n_layers=2,
-    #     d_ff=16,
-    #     dropout=0.1,
-    # )
-
-    model.config = model_config_medium
+    model = TabTransformerBinaryClassifier(**model_config)
+    model.config = model_config
     model.scaler = data["scaler"]
     model.feature_cols = data["feature_cols"]
 

@@ -23,6 +23,7 @@ def model_from_checkpoint(checkpoint: dict) -> CLSQuantumTabTransformerBinaryCla
     model.threshold = checkpoint["threshold"]
     model.feature_cols = checkpoint["feature_cols"]
     model.scaler = Standardizer(mean=checkpoint["scaler_mean"].numpy(), std=checkpoint["scaler_std"].numpy())
+    model.config = checkpoint["model_config"]
 
     if not is_quantum:
         model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))

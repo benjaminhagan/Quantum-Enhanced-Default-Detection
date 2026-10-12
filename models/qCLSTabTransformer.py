@@ -608,12 +608,12 @@ def infer_tabtransformer(model: torch.nn.Module, df: pd.DataFrame, quantum_devic
 
     return  {"auprc": auprc, "auroc": auroc, "probs": probs, "preds": preds, "targets": targets}
 
-def run_experiment(df: pd.DataFrame, lr=3e-4, qufex_params=(4,1,1)):
+def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', qufex_params=(4,1,1), target_col="Class"):
     device = torch.device(dev_name)
 
     data = make_dataloaders(
         df,
-        target_col="Class",
+        target_col=target_col,
         test_size=0.2,
         val_size=0.1,
         batch_size=512,
@@ -621,39 +621,30 @@ def run_experiment(df: pd.DataFrame, lr=3e-4, qufex_params=(4,1,1)):
         seed=42,
     )
 
-    # model = CLSQuantumTabTransformerBinaryClassifier(
-    #     n_features=len(data["feature_cols"]),
-    #     d_token=64,
-    #     n_heads=8,
-    #     n_layers=3,
-    #     d_ff=256,
-    #     dropout=0.1,
-    #     qufex_params=qufex_params,
-    # )
+    if model_size == 'large':
+        model_config = {
+            "n_features": len(data["feature_cols"]),
+            "d_token": 32,
+            "n_heads": 4,
+            "n_layers": 3,
+            "d_ff": 256,
+            "dropout": 0.1,
+            "qufex_params": qufex_params,
+        }
 
-    model_config_medium = {
-        "n_features": len(data["feature_cols"]),
-        "d_token": 32,
-        "n_heads": 4,
-        "n_layers": 2,
-        "d_ff": 64,
-        "dropout": 0.1,
-        "qufex_params": qufex_params,
-    }
+    if model_size == 'small':
+        model_config = {
+            "n_features": len(data["feature_cols"]),
+            "d_token": 32,
+            "n_heads": 4,
+            "n_layers": 2,
+            "d_ff": 64,
+            "dropout": 0.1,
+            "qufex_params": qufex_params,
+        }
 
-    model = CLSQuantumTabTransformerBinaryClassifier(**model_config_medium)
-
-    # model = CLSQuantumTabTransformerBinaryClassifier(
-    #     n_features=len(data["feature_cols"]),
-    #     d_token=32,
-    #     n_heads=4,
-    #     n_layers=2,
-    #     d_ff=16,
-    #     dropout=0.1,
-    #     qufex_params=qufex_params,
-    # )
-
-    model.config = model_config_medium
+    model = CLSQuantumTabTransformerBinaryClassifier(**model_config)
+    model.config = model_config
     model.scaler = data["scaler"]
     model.feature_cols = data["feature_cols"]
     
