@@ -14,7 +14,7 @@ Quantum MLP Implementation: Adds QuFeX layer on every token in MLP layers in bet
 Clone the repository and install the required dependencies:
 
 ```bash
-git clone https://github.com/benjaminhagan/qTabTransformer-Fraud-Detection
-cd qTabTransformer-Fraud-Detection
+git clone https://github.com/benjaminhagan/Quantum-Enhanced-Default-Detection
+cd Quantum-Enhanced-Default-Detection
 pip install -r requirements.txt
 pip install -e .
