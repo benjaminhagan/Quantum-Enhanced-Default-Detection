@@ -1,6 +1,6 @@
-# qTabTransformer-Fraud-Detection
+# Quantum-Enhanced-Default-Detection
 
-Utilizes Tabular Transformer architecture for fraudulent credit card transaction detection. Quantum models use QuFeX parametrized circuits detailed in:
+Utilizes FT Transformer architecture to detect high risk default potential. Quantum models use QuFeX parametrized circuits detailed in:
 https://arxiv.org/pdf/2501.13165
 
 Classical Implementation: Uses GPU accelerated PyTorch interface to establish baseline performance for quantum comparison
