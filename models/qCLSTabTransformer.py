@@ -9,6 +9,7 @@ from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import average_precision_score, roc_auc_score, precision_recall_curve
 from utils.Preprocessor import Standardizer
+import utils.AmexMetrics as AmexMetrics
 import pennylane as qml
 
 #dev_name = "cuda" if torch.cuda.is_available() else "cpu"
@@ -146,7 +147,7 @@ class NumericalTokenizer(nn.Module):
 # -------------------------
 # Quantum circuit
 # -------------------------
-def build_pqc_vit0(n_qubits: int, quantum_device, shots: int):
+def build_pqc_vit0(n_qubits: int, quantum_device, shots: int, entangle):
     using_qpu = quantum_device is not None
     dev = quantum_device
 
@@ -157,7 +158,7 @@ def build_pqc_vit0(n_qubits: int, quantum_device, shots: int):
 
     @qml.qnode(dev, interface="torch", diff_method=diff_method)
     def circuit(inputs, weight_0, weight_1):
-        qml.AngleEmbedding(np.pi * inputs, wires=range(n_qubits), rotation="Y")
+        qml.AngleEmbedding(np.pi * inputs, wires=range(n_qubits), rotation="X")
 
         indices = n_qubits // 2
 
@@ -165,16 +166,19 @@ def build_pqc_vit0(n_qubits: int, quantum_device, shots: int):
         for i in range(indices):
             qml.RX(weight_0[0], wires=2 * i)
             qml.RZ(weight_0[1], wires=2 * i + 1)
-            qml.CNOT(wires=[2 * i, 2 * i + 1])
+            if entangle:
+                qml.CNOT(wires=[2 * i, 2 * i + 1])
 
         for i in range(1, indices):
             qml.RX(weight_0[0], wires=2 * i - 1)
             qml.RZ(weight_0[1], wires=2 * i)
-            qml.CNOT(wires=[2 * i - 1, 2 * i])
+            if entangle:
+                qml.CNOT(wires=[2 * i - 1, 2 * i])
 
         # V1
-        for i in range(indices):
-            qml.CZ(wires=[2 * i, 2 * i + 1])
+        if entangle:
+            for i in range(indices):
+                qml.CZ(wires=[2 * i, 2 * i + 1])
 
         indices = indices // 2
 
@@ -182,16 +186,19 @@ def build_pqc_vit0(n_qubits: int, quantum_device, shots: int):
         for i in range(indices):
             qml.RX(weight_1[0], wires=2 * (2 * i))
             qml.RY(weight_1[1], wires=2 * (2 * i + 1))
-            qml.CNOT(wires=[2 * (2 * i), 2 * (2 * i + 1)])
+            if entangle:
+                qml.CNOT(wires=[2 * (2 * i), 2 * (2 * i + 1)])
 
         for i in range(1, indices):
             qml.RX(weight_1[0], wires=2 * (2 * i - 1))
             qml.RY(weight_1[1], wires=2 * (2 * i))
-            qml.CNOT(wires=[2 * (2 * i - 1), 2 * (2 * i)])
+            if entangle:
+                qml.CNOT(wires=[2 * (2 * i - 1), 2 * (2 * i)])
 
         # V2
-        for i in range(indices):
-            qml.CZ(wires=[2 * (2 * i), 2 * (2 * i + 1)])
+        if entangle:
+            for i in range(indices):
+                qml.CZ(wires=[2 * (2 * i), 2 * (2 * i + 1)])
 
         return [qml.expval(qml.PauliZ(i)) for i in range(n_qubits)]
 
@@ -201,7 +208,7 @@ def build_pqc_vit0(n_qubits: int, quantum_device, shots: int):
     return circuit
 
 
-def build_pqc_vit1(n_qubits: int, quantum_device, shots: int):
+def build_pqc_vit1(n_qubits: int, quantum_device, shots: int, entangle):
     using_qpu = quantum_device is not None
     dev = quantum_device
 
@@ -212,7 +219,7 @@ def build_pqc_vit1(n_qubits: int, quantum_device, shots: int):
 
     @qml.qnode(dev, interface="torch", diff_method=diff_method)
     def circuit(inputs, weight_0, weight_1):
-        qml.AngleEmbedding(np.pi * inputs, wires=range(n_qubits), rotation="Z")
+        qml.AngleEmbedding(np.pi * inputs, wires=range(n_qubits), rotation="X")
 
         indices = n_qubits // 2
 
@@ -220,16 +227,19 @@ def build_pqc_vit1(n_qubits: int, quantum_device, shots: int):
         for i in range(indices):
             qml.RY(weight_0[0], wires=2*i)
             qml.RX(weight_0[1], wires=2*i+1)
-            qml.CNOT(wires=[2*i, 2*i+1])
+            if entangle:
+                qml.CNOT(wires=[2*i, 2*i+1])
         
         for i in range(1, indices):
             qml.RY(weight_0[0], wires=2*i - 1)
             qml.RX(weight_0[1], wires=2*i)
-            qml.CNOT(wires=[2*i - 1, 2*i])
+            if entangle:
+                qml.CNOT(wires=[2*i - 1, 2*i])
 
         # V1
-        for i in range(indices):
-            qml.CZ(wires=[2*i, 2*i+1])
+        if entangle:
+            for i in range(indices):
+                qml.CZ(wires=[2*i, 2*i+1])
 
         indices = int(indices/2)
 
@@ -237,16 +247,19 @@ def build_pqc_vit1(n_qubits: int, quantum_device, shots: int):
         for i in range(indices):
             qml.RZ(weight_1[0], wires=2*(2*i))
             qml.RX(weight_1[1], wires=2*(2*i+1))
-            qml.CNOT(wires=[2*(2*i), 2*(2*i+1)])
+            if entangle:
+                qml.CNOT(wires=[2*(2*i), 2*(2*i+1)])
         
         for i in range(1, indices):
             qml.RZ(weight_1[0], wires=2*(2*i - 1))
             qml.RX(weight_1[1], wires=2*(2*i))
-            qml.CNOT(wires=[2*(2*i - 1), 2*(2*i)])
+            if entangle:
+                qml.CNOT(wires=[2*(2*i - 1), 2*(2*i)])
         
         # V2
-        for i in range(indices):
-            qml.CZ(wires=[2*(2*i), 2*(2*i+1)])
+        if entangle:
+            for i in range(indices):
+                qml.CZ(wires=[2*(2*i), 2*(2*i+1)])
 
         return [qml.expval(qml.PauliX(wires=i)) for i in range(n_qubits)]
 
@@ -291,9 +304,9 @@ class QuantumCLSBlock(nn.Module):
 
         self.configure_quantum_execution(quantum_device, shots)
 
-    def configure_quantum_execution(self, quantum_device, shots: int):
-        self.circuit0 = build_pqc_vit0(self.n_qubits, quantum_device, shots)
-        self.circuit1 = build_pqc_vit1(self.n_qubits, quantum_device, shots)
+    def configure_quantum_execution(self, quantum_device, shots: int, entangling=True):
+        self.circuit0 = build_pqc_vit0(self.n_qubits, quantum_device, shots, entangling)
+        self.circuit1 = build_pqc_vit1(self.n_qubits, quantum_device, shots, entangling)
 
     def _run_quantum_chunk(self, chunk_2d: torch.Tensor, weight_0: torch.Tensor, weight_1: torch.Tensor, filter_idx: int) -> torch.Tensor:
         outs = []
@@ -374,6 +387,8 @@ class CLSQuantumTabTransformerBinaryClassifier(nn.Module):
 
         self.tokenizer = NumericalTokenizer(n_features=n_features, d_token=d_token)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, d_token))
+        # self.norm_ratios = []
+        # self.cos_similarities = []
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_token,
@@ -406,12 +421,13 @@ class CLSQuantumTabTransformerBinaryClassifier(nn.Module):
 
         nn.init.normal_(self.cls_token, mean=0.0, std=0.02)
 
-    def configure_quantum_execution(self, quantum_device, shots: int):
+    def configure_quantum_execution(self, quantum_device, shots: int, entangling=True):
         self.quantum_device = quantum_device
         self.shots = shots
         self.quantum_cls.configure_quantum_execution(
             quantum_device=quantum_device,
             shots=shots,
+            entangling=entangling
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -423,6 +439,12 @@ class CLSQuantumTabTransformerBinaryClassifier(nn.Module):
         cls_out = z[:, 0]                                   
 
         cls_quantum = self.quantum_cls(cls_out)                 # quantum only 
+
+        # residual_norm = cls_out.norm(dim=-1)
+        # quantum_norm = cls_quantum.norm(dim=-1)
+        # norm_ratio = quantum_norm / (residual_norm + 1e-8)
+        # self.norm_ratios.append(norm_ratio)
+        # self.cos_similarities.append(torch.nn.functional.cosine_similarity(cls_out, cls_quantum, dim=-1))
 
         cls_out = cls_out + cls_quantum     #With residual connections
         #cls_out = cls_quantum               #Without residual connections
@@ -469,7 +491,7 @@ def train_model(
     grad_clip: float = 1.0,
 ):
     model.to(device)
-    #criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight.to(device))
+    #criterion = nn.BCEWithLogitsLoss()
     criterion = FocalLoss(alpha=1.0, gamma=2.0) #Replaced loss function with Focal Loss to handle the imbalanced data
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -477,10 +499,9 @@ def train_model(
     )
 
     best_state = None
-    best_val_auprc = -1.0
+    best_val_amex_metric = -1.0
 
-    auprcs = []
-    aurocs = []
+    amex_metrics = []
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -502,10 +523,10 @@ def train_model(
 
         train_loss = running_loss / len(train_loader.dataset)
         val_metrics = evaluate(model, val_loader, device)
-        scheduler.step(val_metrics["auprc"])
+        scheduler.step(val_metrics["amex_metric"])
 
-        if val_metrics["auprc"] > best_val_auprc:
-            best_val_auprc = val_metrics["auprc"]
+        if val_metrics["amex_metric"] > best_val_amex_metric:
+            best_val_amex_metric = val_metrics["amex_metric"]
             best_state = copy.deepcopy(model.state_dict())
 
             # Choose classification threshold using validation set
@@ -525,18 +546,16 @@ def train_model(
         # print(
         #     f"Epoch {epoch:02d} | "
         #     f"train_loss={train_loss:.5f} | "
-        #     f"val_auprc={val_metrics['auprc']:.5f} | "
-        #     f"val_auroc={val_metrics['auroc']:.5f}"
+        #     f"val_amex_metric={val_metrics['amex_metric']:.5f} | "
         # )
 
-        auprcs.append(val_metrics['auprc'])
-        aurocs.append(val_metrics['auroc'])
+        amex_metrics.append(val_metrics['amex_metric'])
 
     if best_state is not None:
         model.load_state_dict(best_state)
         model.threshold = best_threshold
 
-    return model, auprcs, aurocs
+    return model, amex_metrics
 
 @torch.no_grad()
 def evaluate(model, loader, device):
@@ -557,13 +576,11 @@ def evaluate(model, loader, device):
     probs = np.concatenate(all_probs)
     targets = np.concatenate(all_targets)
 
-    auprc = average_precision_score(targets, probs)
-    try:
-        auroc = roc_auc_score(targets, probs)
-    except ValueError:
-        auroc = float("nan")
+    #auprc = average_precision_score(targets, probs)
+    amex_metric = AmexMetrics.amex_metric(pd.DataFrame({"target": targets}), pd.DataFrame({"prediction": probs}))
 
-    return {"auprc": auprc, "auroc": auroc, "probs": probs, "targets": targets}
+    return {"amex_metric": amex_metric, "probs": probs, "targets": targets}
+
 
 @torch.no_grad()
 def infer_tabtransformer(model: torch.nn.Module, df: pd.DataFrame, quantum_device = None, shots: int = 1024, target_col: str = "Class", seed: int = 42):
@@ -598,17 +615,13 @@ def infer_tabtransformer(model: torch.nn.Module, df: pd.DataFrame, quantum_devic
             probs_list.append(probs.cpu())
 
     probs = torch.cat(probs_list).numpy()
-    auprc = average_precision_score(targets, probs)
+    #amex_metric = average_precision_score(targets, probs)
+    amex_metric = AmexMetrics.amex_metric(pd.DataFrame({"target": targets}), pd.DataFrame({"prediction": probs}))
     preds = (probs >= model.threshold).astype(int)
 
-    try:
-        auroc = roc_auc_score(targets, probs)
-    except ValueError:
-        auroc = float("nan")
+    return  {"amex_metric": amex_metric, "probs": probs, "preds": preds, "targets": targets}
 
-    return  {"auprc": auprc, "auroc": auroc, "probs": probs, "preds": preds, "targets": targets}
-
-def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', qufex_params=(4,1,1), target_col="Class"):
+def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', qufex_params=(4,1,1), target_col="Class", entangling=True):
     device = torch.device(dev_name)
 
     data = make_dataloaders(
@@ -617,7 +630,7 @@ def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', qufex_params=(
         test_size=0.2,
         val_size=0.1,
         batch_size=512,
-        use_weighted_sampler=True,
+        use_weighted_sampler=False,
         seed=42,
     )
 
@@ -647,8 +660,9 @@ def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', qufex_params=(
     model.config = model_config
     model.scaler = data["scaler"]
     model.feature_cols = data["feature_cols"]
+    model.configure_quantum_execution(quantum_device=None, shots=1024, entangling=entangling)
     
-    model, auprcs, aurocs = train_model(
+    model, amex_metrics = train_model(
         model,
         data["train_loader"],
         data["val_loader"],
@@ -659,7 +673,6 @@ def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', qufex_params=(
     )
 
     test_metrics = evaluate(model, data["test_loader"], device)
-    # print(f"Test AUPRC: {test_metrics['auprc']}")
-    # print(f"Test AUROC: {test_metrics['auroc']}")
+    # print(f"Test amex_metric: {test_metrics['amex_metric']}")
 
     return model, test_metrics, data['test_df']

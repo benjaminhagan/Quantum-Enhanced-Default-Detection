@@ -12,6 +12,7 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset, WeightedRandomS
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import average_precision_score, roc_auc_score, precision_recall_curve
 from utils.Preprocessor import Standardizer
+import utils.AmexMetrics as AmexMetrics
 
 dev_name = "cuda" if torch.cuda.is_available() else "cpu"
 #dev_name = "cpu"
@@ -231,7 +232,7 @@ def train_model(
     grad_clip: float = 1.0,
 ):
     model.to(device)
-    #criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight.to(device))
+    #criterion = nn.BCEWithLogitsLoss()
     criterion = FocalLoss(alpha=1.0, gamma=2.0) #Replaced loss function with Focal Loss to handle the imbalanced data
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -239,11 +240,10 @@ def train_model(
     )
 
     best_state = None
-    best_val_auprc = -1.0
+    best_val_amex_metric = -1.0
     best_threshold = -1.0
 
-    auprcs = []
-    aurocs = []
+    amex_metrics = []
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -266,10 +266,10 @@ def train_model(
 
         train_loss = running_loss / len(train_loader.dataset)
         val_metrics = evaluate(model, val_loader, device)
-        scheduler.step(val_metrics["auprc"])
+        scheduler.step(val_metrics["amex_metric"])
 
-        if val_metrics["auprc"] > best_val_auprc:
-            best_val_auprc = val_metrics["auprc"]
+        if val_metrics["amex_metric"] > best_val_amex_metric:
+            best_val_amex_metric = val_metrics["amex_metric"]
             best_state = copy.deepcopy(model.state_dict())
 
             # Choose classification threshold using validation set
@@ -289,17 +289,15 @@ def train_model(
         # print(
         #     f"Epoch {epoch:02d} | "
         #     f"train_loss={train_loss:.5f} | "
-        #     f"val_auprc={val_metrics['auprc']:.5f} | "
-        #     f"val_auroc={val_metrics['auroc']:.5f}"
+        #     f"val_amex_metric={val_metrics['amex_metric']:.5f} | "
         # )
-        auprcs.append(val_metrics['auprc'])
-        aurocs.append(val_metrics['auroc'])
+        amex_metrics.append(val_metrics['amex_metric'])
 
     if best_state is not None:
         model.load_state_dict(best_state)
         model.threshold = best_threshold
 
-    return model, auprcs, aurocs
+    return model, amex_metrics
 
 
 @torch.no_grad()
@@ -321,13 +319,10 @@ def evaluate(model, loader, device):
     probs = np.concatenate(all_probs)
     targets = np.concatenate(all_targets)
 
-    auprc = average_precision_score(targets, probs)
-    try:
-        auroc = roc_auc_score(targets, probs)
-    except ValueError:
-        auroc = float("nan")
+    #amex_metric = average_precision_score(targets, probs)
+    amex_metric = AmexMetrics.amex_metric(pd.DataFrame({"target": targets}), pd.DataFrame({"prediction": probs}))
 
-    return {"auprc": auprc, "auroc": auroc, "probs": probs, "targets": targets}
+    return {"amex_metric": amex_metric, "probs": probs, "targets": targets}
 
 
 @torch.no_grad()
@@ -360,15 +355,11 @@ def infer_tabtransformer(model: torch.nn.Module, df: pd.DataFrame, target_col: s
             probs_list.append(probs.cpu())
 
     probs = torch.cat(probs_list).numpy()
-    auprc = average_precision_score(targets, probs)
+    #auprc = average_precision_score(targets, probs)
+    amex_metric = AmexMetrics.amex_metric(pd.DataFrame({"target": targets}), pd.DataFrame({"prediction": probs}))
     preds = (probs >= model.threshold).astype(int)
 
-    try:
-        auroc = roc_auc_score(targets, probs)
-    except ValueError:
-        auroc = float("nan")
-
-    return  {"auprc": auprc, "auroc": auroc, "probs": probs, "preds": preds, "targets": targets}
+    return  {"amex_metric": amex_metric, "probs": probs, "preds": preds, "targets": targets}
 
 # -------------------------
 # Full ML workflow
@@ -383,7 +374,7 @@ def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', target_col="Cl
         test_size=0.2,
         val_size=0.1,
         batch_size=512,
-        use_weighted_sampler=True,
+        use_weighted_sampler=False,
         seed=42
     )
 
@@ -412,7 +403,7 @@ def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', target_col="Cl
     model.scaler = data["scaler"]
     model.feature_cols = data["feature_cols"]
 
-    model, auprcs, aurocs = train_model(
+    model, amex_metrics = train_model(
         model,
         data["train_loader"],
         data["val_loader"],
@@ -425,7 +416,6 @@ def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', target_col="Cl
     )
 
     test_metrics = evaluate(model, data["test_loader"], device)
-    # print(f"Test AUPRC: {test_metrics['auprc']}")
-    # print(f"Test AUROC: {test_metrics['auroc']}")
+    # print(f"Test amex_metric: {test_metrics['amex_metric']}")
 
     return model, test_metrics, data['test_df']
