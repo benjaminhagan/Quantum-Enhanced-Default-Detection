@@ -1,6 +1,6 @@
-# qTabTransformer-Fraud-Detection
+# Quantum-Enhanced-Default-Detection
 
-Utilizes Tabular Transformer architecture for fraudulent credit card transaction detection. Quantum models use QuFeX parametrized circuits detailed in:
+Utilizes FT Transformer architecture to detect high risk default potential. Quantum models use QuFeX parametrized circuits detailed in:
 https://arxiv.org/pdf/2501.13165
 
 Classical Implementation: Uses GPU accelerated PyTorch interface to establish baseline performance for quantum comparison
@@ -14,7 +14,7 @@ Quantum MLP Implementation: Adds QuFeX layer on every token in MLP layers in bet
 Clone the repository and install the required dependencies:
 
 ```bash
-git clone https://github.com/benjaminhagan/qTabTransformer-Fraud-Detection
-cd qTabTransformer-Fraud-Detection
+git clone https://github.com/benjaminhagan/Quantum-Enhanced-Default-Detection
+cd Quantum-Enhanced-Default-Detection
 pip install -r requirements.txt
 pip install -e .
