@@ -2,5 +2,6 @@
 __pycache__/
 *.py[cod]
 *.pt
+*.npy
 .ipynb_checkpoints/
 qtabtransformer_fraud_detection.egg-info
