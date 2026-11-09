@@ -14,8 +14,8 @@ from sklearn.metrics import average_precision_score, roc_auc_score, precision_re
 from utils.Preprocessor import Standardizer
 import utils.AmexMetrics as AmexMetrics
 
-dev_name = "cuda" if torch.cuda.is_available() else "cpu"
-#dev_name = "cpu"
+#dev_name = "cuda" if torch.cuda.is_available() else "cpu"
+dev_name = "cpu"
 PIN_MEMORY = dev_name == "cuda" #Pins memory only for GPU acceleration
 
 # -------------------------
