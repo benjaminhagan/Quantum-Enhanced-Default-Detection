@@ -3,7 +3,7 @@ from models.qCLSTabTransformer import CLSQuantumTabTransformerBinaryClassifier
 from models.TabTransformer import TabTransformerBinaryClassifier
 from utils.Preprocessor import Standardizer
 
-def checkpoint_from_model(model: CLSQuantumTabTransformerBinaryClassifier) -> dict:
+def checkpoint_from_model(model: CLSQuantumTabTransformerBinaryClassifier | TabTransformerBinaryClassifier) -> dict:
     checkpoint = {
         "model_config": model.config,
         "model_state_dict": model.state_dict(),
@@ -15,7 +15,7 @@ def checkpoint_from_model(model: CLSQuantumTabTransformerBinaryClassifier) -> di
     return checkpoint
 
 
-def model_from_checkpoint(checkpoint: dict) -> CLSQuantumTabTransformerBinaryClassifier:
+def model_from_checkpoint(checkpoint: dict) -> CLSQuantumTabTransformerBinaryClassifier | TabTransformerBinaryClassifier:
     is_quantum = "qufex_params" in checkpoint["model_config"]
 
     model = CLSQuantumTabTransformerBinaryClassifier(**checkpoint["model_config"]) if is_quantum else TabTransformerBinaryClassifier(**checkpoint["model_config"])

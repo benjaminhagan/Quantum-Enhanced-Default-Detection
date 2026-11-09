@@ -283,6 +283,7 @@ class QuantumCLSBlock(nn.Module):
         n_qubits: int = 4,
         n_filters: int = 1,
         dropout_rate: float = 0.1,
+        entangling: bool = True,
     ):
         super().__init__()
         assert quantum_dim % n_qubits == 0, "quantum_dim must be divisible by n_qubits"
@@ -302,7 +303,7 @@ class QuantumCLSBlock(nn.Module):
         self.weight_0 = nn.Parameter(0.01 * torch.randn(n_filters, 2))
         self.weight_1 = nn.Parameter(0.01 * torch.randn(n_filters, 2))
 
-        self.configure_quantum_execution(quantum_device, shots)
+        self.configure_quantum_execution(quantum_device, shots, entangling)
 
     def configure_quantum_execution(self, quantum_device, shots: int, entangling=True):
         self.circuit0 = build_pqc_vit0(self.n_qubits, quantum_device, shots, entangling)
@@ -375,6 +376,7 @@ class CLSQuantumTabTransformerBinaryClassifier(nn.Module):
         d_ff: int = 256,
         dropout: float = 0.1,
         qufex_params: tuple = (4,1,1),
+        entangling: bool = True,
         quantum_device = None,
         shots: int = 1024,
     ):
@@ -387,8 +389,6 @@ class CLSQuantumTabTransformerBinaryClassifier(nn.Module):
 
         self.tokenizer = NumericalTokenizer(n_features=n_features, d_token=d_token)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, d_token))
-        # self.norm_ratios = []
-        # self.cos_similarities = []
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_token,
@@ -409,6 +409,7 @@ class CLSQuantumTabTransformerBinaryClassifier(nn.Module):
             n_qubits=n_qubits,
             n_filters=n_filters,
             dropout_rate=dropout,
+            entangling=entangling,
         )
 
         self.head = nn.Sequential(
@@ -439,12 +440,6 @@ class CLSQuantumTabTransformerBinaryClassifier(nn.Module):
         cls_out = z[:, 0]                                   
 
         cls_quantum = self.quantum_cls(cls_out)                 # quantum only 
-
-        # residual_norm = cls_out.norm(dim=-1)
-        # quantum_norm = cls_quantum.norm(dim=-1)
-        # norm_ratio = quantum_norm / (residual_norm + 1e-8)
-        # self.norm_ratios.append(norm_ratio)
-        # self.cos_similarities.append(torch.nn.functional.cosine_similarity(cls_out, cls_quantum, dim=-1))
 
         cls_out = cls_out + cls_quantum     #With residual connections
         #cls_out = cls_quantum               #Without residual connections
@@ -643,6 +638,7 @@ def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', qufex_params=(
             "d_ff": 256,
             "dropout": 0.1,
             "qufex_params": qufex_params,
+            "entangling": entangling,
         }
 
     if model_size == 'small':
@@ -654,13 +650,13 @@ def run_experiment(df: pd.DataFrame, lr=3e-3, model_size='small', qufex_params=(
             "d_ff": 64,
             "dropout": 0.1,
             "qufex_params": qufex_params,
+            "entangling": entangling,
         }
 
     model = CLSQuantumTabTransformerBinaryClassifier(**model_config)
     model.config = model_config
     model.scaler = data["scaler"]
     model.feature_cols = data["feature_cols"]
-    model.configure_quantum_execution(quantum_device=None, shots=1024, entangling=entangling)
     
     model, amex_metrics = train_model(
         model,
